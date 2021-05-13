@@ -120,6 +120,9 @@ public class DeploymentService extends GreengrassService {
     @Inject
     private ComponentStore componentStore;
 
+    @Inject
+    private DeploymentDocumentDownloader deploymentDocumentDownloader;
+
     /**
      * Constructor.
      *
@@ -622,7 +625,8 @@ public class DeploymentService extends GreengrassService {
             return null;
         }
         return new DefaultDeploymentTask(dependencyResolver, componentManager, kernelConfigResolver,
-                deploymentConfigMerger, logger.createChild(), deployment, config, executorService);
+                deploymentConfigMerger, logger.createChild(), deployment, config, executorService,
+                deploymentDocumentDownloader);
     }
 
     private DeploymentDocument parseAndValidateJobDocument(Deployment deployment) throws InvalidRequestException {

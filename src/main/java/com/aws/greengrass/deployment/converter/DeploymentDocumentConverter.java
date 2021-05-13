@@ -217,7 +217,12 @@ public final class DeploymentDocumentConverter {
         return builder.build();
     }
 
-    private static ConfigurationUpdateOperation convertComponentUpdateOperation(
+    /**
+     * Convert configuration update from Cloud/Device shared model to the device-side model.
+     * @param configurationUpdate   common model shared between cloud and device
+     * @return  device-side model for configuration update
+     */
+    public static ConfigurationUpdateOperation convertComponentUpdateOperation(
             @Nullable ConfigurationUpdate configurationUpdate) {
         if (configurationUpdate == null) {
             return null;
