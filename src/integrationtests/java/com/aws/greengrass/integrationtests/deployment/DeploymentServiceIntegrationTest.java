@@ -260,7 +260,7 @@ class DeploymentServiceIntegrationTest extends BaseITCase {
                 deploymentCDL.countDown();
                 assertThat(((Map) status.get(DEPLOYMENT_STATUS_DETAILS_KEY_NAME)).get(DEPLOYMENT_FAILURE_CAUSE_KEY),
                         equalTo("The current nucleus version doesn't support one or more capabilities that are required by "
-                    + "this deployment: LARGE_CONFIGURATION, ANOTHER_CAPABILITY"));
+                    + "this deployment: ANOTHER_CAPABILITY"));
             }
             return true;
         },"dummy");
@@ -414,12 +414,13 @@ class DeploymentServiceIntegrationTest extends BaseITCase {
         deploymentStatusKeeper.registerDeploymentStatusConsumer(DeploymentType.LOCAL, (status) -> {
 
             if(status.get(DEPLOYMENT_ID_KEY_NAME).equals("requiredCapabilityNotPresent") &&
-                    status.get(DEPLOYMENT_STATUS_KEY_NAME).equals("FAILED") &&
-                    ((Map)status.get(DEPLOYMENT_STATUS_DETAILS_KEY_NAME)).get(DEPLOYMENT_FAILURE_CAUSE_KEY)
-                            .equals("The current nucleus version doesn't support one or more capabilities that are "
-                                    + "required by this deployment: NOT_SUPPORTED_1, NOT_SUPPORTED_2, LARGE_CONFIGURATION")){
+                    status.get(DEPLOYMENT_STATUS_KEY_NAME).equals("FAILED")) {
                 deploymentCDL.countDown();
+                assertThat(((Map)status.get(DEPLOYMENT_STATUS_DETAILS_KEY_NAME)).get(DEPLOYMENT_FAILURE_CAUSE_KEY),
+                        equalTo("The current nucleus version doesn't support one or more capabilities that are "
+                        + "required by this deployment: NOT_SUPPORTED_1, NOT_SUPPORTED_2"));
             }
+
             return true;
         },"DeploymentServiceIntegrationTest3" );
 
@@ -432,7 +433,8 @@ class DeploymentServiceIntegrationTest extends BaseITCase {
                 .build();
 
         submitLocalDocument(request);
-        assertTrue(deploymentCDL.await(10, TimeUnit.SECONDS));
+        assertTrue(deploymentCDL.await(10, TimeUnit.SECONDS), "Deployment should fail with "
+                + "requiredCapabilityNotPresent.");
     }
 
     private void submitSampleJobDocument(URI uri, String arn, DeploymentType type) throws Exception {
