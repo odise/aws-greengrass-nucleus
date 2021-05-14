@@ -137,6 +137,7 @@ class DeploymentDocumentDownloaderTest {
         // change thing name
         String newThingName = "newThingName";
         thingNameTopic.withValue(newThingName);
+        thingNameTopic.context.waitForPublishQueueToClear(); // so that newThingName is published.
 
         when(httpClientProvider.getSdkHttpClient()).thenReturn(httpClient);
 
