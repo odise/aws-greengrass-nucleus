@@ -87,7 +87,7 @@ public class ProvisionFromTestPlugin extends BaseITCase {
         CountDownLatch logLatch =  new CountDownLatch(2);
         CountDownLatch reverseLatch = new CountDownLatch(1);
         DeviceConfiguration deviceConfiguration = kernel.getContext().get(DeviceConfiguration.class);
-        TestUtils.createCloseableLogListener((message) -> {
+        try (AutoCloseable listener = TestUtils.createCloseableLogListener((message) -> {
             String messageString = message.getMessage();
             if (messageString.contains("Device not configured to talk to AWS Iot cloud")) {
                 logLatch.countDown();
@@ -104,11 +104,12 @@ public class ProvisionFromTestPlugin extends BaseITCase {
                 });
                 logLatch.countDown();
             }
-        });
+        })) {
 
-        kernel.launch();
-        assertTrue(logLatch.await(2, TimeUnit.SECONDS));
-        assertFalse(reverseLatch.await(5, TimeUnit.SECONDS));
+            kernel.launch();
+            assertTrue(logLatch.await(2, TimeUnit.SECONDS));
+            assertFalse(reverseLatch.await(5, TimeUnit.SECONDS));
+        }
     }
 
     @Order(2)
@@ -125,22 +126,24 @@ public class ProvisionFromTestPlugin extends BaseITCase {
         ConfigPlatformResolver.initKernelWithMultiPlatformConfig(kernel, configFilePath.toUri().toURL());
 
         CountDownLatch logLatch =  new CountDownLatch(1);
-        TestUtils.createCloseableLogListener((message) -> {
-            String messageString = message.getMessage();
-            if (messageString.contains("Device not configured to talk to AWS Iot cloud")) {
-                logLatch.countDown();
-            }
-        });
         CountDownLatch reverseLatch = new CountDownLatch(1);
-        TestUtils.createCloseableLogListener((message) -> {
-            String messageString = message.getMessage();
-            if (messageString.contains("Updated provisioning configuration")) {
-                reverseLatch.countDown();
-            }
-        });
-        kernel.launch();
-        assertTrue(logLatch.await(2, TimeUnit.SECONDS));
-        assertFalse(reverseLatch.await(2, TimeUnit.SECONDS));
+        try (AutoCloseable listener = TestUtils.createCloseableLogListener((message) -> {
+                String messageString = message.getMessage();
+                if (messageString.contains("Device not configured to talk to AWS Iot cloud")) {
+                    logLatch.countDown();
+                }
+             });
+             AutoCloseable reverseListener = TestUtils.createCloseableLogListener((message) -> {
+                 String messageString = message.getMessage();
+                 if (messageString.contains("Updated provisioning configuration")) {
+                     reverseLatch.countDown();
+                 }
+             });
+        ) {
+            kernel.launch();
+            assertTrue(logLatch.await(2, TimeUnit.SECONDS));
+            assertFalse(reverseLatch.await(2, TimeUnit.SECONDS));
+        }
     }
 
     @Order(3)
@@ -182,7 +185,7 @@ public class ProvisionFromTestPlugin extends BaseITCase {
         ConfigPlatformResolver.initKernelWithMultiPlatformConfig(kernel, configFilePath.toUri().toURL());
         addProvisioningPlugin("testProvisioningPlugin-tests.jar");
         CountDownLatch logLatch =  new CountDownLatch(5);
-        TestUtils.createCloseableLogListener((message) -> {
+        try (AutoCloseable listener = TestUtils.createCloseableLogListener((message) -> {
             String messageString = message.getMessage();
             if (messageString.contains("Device not configured to talk to AWS Iot cloud")
                     || logLatch.getCount() < 5 && "Updated provisioning configuration".equals(messageString)
@@ -191,14 +194,15 @@ public class ProvisionFromTestPlugin extends BaseITCase {
                     || "Configuring GGV2 client".equals(messageString) && logLatch.getCount() < 4) {
                 logLatch.countDown();
             }
-        });
-
-        kernel.launch();
-        assertTrue(logLatch.await(7, TimeUnit.SECONDS));
-        DeviceConfiguration deviceConfiguration = kernel.getContext().get(DeviceConfiguration.class);
-        assertEquals("test.us-east-1.iot.data.endpoint", Coerce.toString(deviceConfiguration.getIotDataEndpoint()));
-        assertEquals(generatedCertFilePath, Coerce.toString(deviceConfiguration.getCertificateFilePath()));
-        deleteProvisioningPlugins();
+        })) {
+            kernel.launch();
+            assertTrue(logLatch.await(7, TimeUnit.SECONDS));
+            DeviceConfiguration deviceConfiguration = kernel.getContext().get(DeviceConfiguration.class);
+            assertEquals("test.us-east-1.iot.data.endpoint", Coerce.toString(deviceConfiguration.getIotDataEndpoint()));
+            assertEquals(generatedCertFilePath, Coerce.toString(deviceConfiguration.getCertificateFilePath()));
+        } finally {
+            deleteProvisioningPlugins();
+        }
     }
 
     @Order(5)
@@ -218,7 +222,7 @@ public class ProvisionFromTestPlugin extends BaseITCase {
         ConfigPlatformResolver.initKernelWithMultiPlatformConfig(kernel, configFilePath.toUri().toURL());
         addProvisioningPlugin("testProvisioningPlugin-tests.jar");
         CountDownLatch logLatch =  new CountDownLatch(4);
-        TestUtils.createCloseableLogListener((message) -> {
+        try ( AutoCloseable listener = TestUtils.createCloseableLogListener((message) -> {
             String messageString = message.getMessage();
             if ("Updated provisioning configuration".equals(messageString)
                     || "Subscribing to Iot Jobs Topics".equals(messageString) && logLatch.getCount() < 4
@@ -226,14 +230,15 @@ public class ProvisionFromTestPlugin extends BaseITCase {
                     || "Configuring GGV2 client".equals(messageString) && logLatch.getCount() < 4) {
                 logLatch.countDown();
             }
-        });
-
-        kernel.launch();
-        assertTrue(logLatch.await(7, TimeUnit.SECONDS));
-        DeviceConfiguration deviceConfiguration = kernel.getContext().get(DeviceConfiguration.class);
-        assertEquals("test.us-east-1.iot.data.endpoint", Coerce.toString(deviceConfiguration.getIotDataEndpoint()));
-        assertEquals(generatedCertFilePath, Coerce.toString(deviceConfiguration.getCertificateFilePath()));
-        deleteProvisioningPlugins();
+        })) {
+            kernel.launch();
+            assertTrue(logLatch.await(7, TimeUnit.SECONDS));
+            DeviceConfiguration deviceConfiguration = kernel.getContext().get(DeviceConfiguration.class);
+            assertEquals("test.us-east-1.iot.data.endpoint", Coerce.toString(deviceConfiguration.getIotDataEndpoint()));
+            assertEquals(generatedCertFilePath, Coerce.toString(deviceConfiguration.getCertificateFilePath()));
+        } finally {
+            deleteProvisioningPlugins();
+        }
     }
 
     private String replaceConfgPrameters(String configTemplate, String generatedCertFilePath, String waitimeInMs) throws IOException {

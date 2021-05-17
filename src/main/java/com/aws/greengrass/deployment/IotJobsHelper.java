@@ -57,8 +57,10 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -142,6 +144,9 @@ public class IotJobsHelper implements InjectionActions {
 
     @Setter // For tests
     private IotJobsClientWrapper iotJobsClientWrapper;
+
+    private AtomicBoolean isSubscribedToIotJobsTopics = new AtomicBoolean(false);
+    private Future<?> subscriptionFuture;
     private final Consumer<JobExecutionsChangedEvent> eventHandler = event -> {
         /*
          * This message is received when either of these things happen
@@ -298,11 +303,15 @@ public class IotJobsHelper implements InjectionActions {
     }
 
     private boolean relevantNodeChanged(Node node) {
-        // List of configuration nodes that we need to reconfigure for if they change
-        return node.childOf(DEVICE_PARAM_THING_NAME) || node.childOf(DEVICE_PARAM_IOT_DATA_ENDPOINT)
-                || node.childOf(DEVICE_PARAM_PRIVATE_KEY_PATH)
-                || node.childOf(DEVICE_PARAM_CERTIFICATE_FILE_PATH) || node.childOf(DEVICE_PARAM_ROOT_CA_PATH)
-                || node.childOf(DEVICE_PARAM_AWS_REGION);
+        if (this.isSubscribedToIotJobsTopics.get()) {
+            return node.childOf(DEVICE_PARAM_THING_NAME);
+        } else {
+            // List of configuration nodes that may change during device provisioning
+            return node.childOf(DEVICE_PARAM_THING_NAME) || node.childOf(DEVICE_PARAM_IOT_DATA_ENDPOINT)
+                    || node.childOf(DEVICE_PARAM_PRIVATE_KEY_PATH)
+                    || node.childOf(DEVICE_PARAM_CERTIFICATE_FILE_PATH) || node.childOf(DEVICE_PARAM_ROOT_CA_PATH)
+                    || node.childOf(DEVICE_PARAM_AWS_REGION);
+        }
     }
 
     private void connectToIotJobs(DeviceConfiguration deviceConfiguration)
@@ -324,12 +333,18 @@ public class IotJobsHelper implements InjectionActions {
 
         logger.dfltKv("ThingName", (Supplier<String>) () ->
                 Coerce.toString(deviceConfiguration.getThingName()));
-        executorService.execute(() -> {
-            subscribeToJobsTopics();
-            logger.atInfo().log("Connection established to IoT cloud");
-            deploymentStatusKeeper.publishPersistedStatusUpdates(DeploymentType.IOT_JOBS);
-            this.fleetStatusService.updateFleetStatusUpdateForAllComponents();
-        });
+        if (subscriptionFuture != null && !subscriptionFuture.isDone()) {
+            subscriptionFuture.cancel(false);
+        }
+        if (subscriptionFuture == null || subscriptionFuture.isDone()) {
+            subscriptionFuture = executorService.submit(() -> {
+                subscribeToJobsTopics();
+                logger.atInfo().log("Connection established to IoT cloud");
+                this.isSubscribedToIotJobsTopics.set(true);
+                deploymentStatusKeeper.publishPersistedStatusUpdates(DeploymentType.IOT_JOBS);
+                this.fleetStatusService.updateFleetStatusUpdateForAllComponents();
+            });
+        }
     }
 
     private Boolean deploymentStatusChanged(Map<String, Object> deploymentDetails) {
@@ -463,6 +478,7 @@ public class IotJobsHelper implements InjectionActions {
         logger.atDebug().log("Unsubscribing from Iot Jobs topics");
         unsubscribeFromEventNotifications();
         unsubscribeFromJobDescription();
+        this.isSubscribedToIotJobsTopics.set(false);
     }
 
     /**

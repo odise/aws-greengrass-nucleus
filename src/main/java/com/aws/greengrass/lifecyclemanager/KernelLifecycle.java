@@ -74,7 +74,7 @@ import static com.aws.greengrass.util.Utils.deepToString;
 
 public class KernelLifecycle {
     private static final Logger logger = LogManager.getLogger(KernelLifecycle.class);
-    private static final int EXECUTOR_SHUTDOWN_TIMEOUT_SECONDS = 40;
+    private static final int EXECUTOR_SHUTDOWN_TIMEOUT_SECONDS = 30;
     // Enum for provision policy will exist in common library package
     // This will be done as part of re-provisioning
     // TODO:  Use the enum from common library when available
@@ -495,8 +495,8 @@ public class KernelLifecycle {
             boolean scheduledExecutorTerminated = scheduledExecutorService.awaitTermination(timeoutSeconds,
                     TimeUnit.SECONDS);
             logger.atInfo("executor-service-shutdown-complete")
-                    .kv("executor terminated", executorTerminated)
-                    .kv("ScheduledExecutor terminated", scheduledExecutorTerminated).log();
+                    .kv("executor-terminated", executorTerminated)
+                    .kv("scheduled-executor-terminated", scheduledExecutorTerminated).log();
             //Stop the telemetry logger context after each test so we can delete the telemetry log files that are
             // created during the test.
             TelemetryConfig.getInstance().closeContext();

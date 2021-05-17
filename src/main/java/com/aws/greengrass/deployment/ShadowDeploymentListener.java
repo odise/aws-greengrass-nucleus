@@ -45,8 +45,10 @@ import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.inject.Inject;
@@ -97,6 +99,8 @@ public class ShadowDeploymentListener implements InjectionActions {
     @Setter
     private IotShadowClient iotShadowClient;
     private String thingName;
+    private AtomicBoolean isSubscribedToShadowTopics = new AtomicBoolean(false);
+    private Future<?> subscriptionFuture;
 
     @Getter
     public MqttClientConnectionEvents callbacks = new MqttClientConnectionEvents() {
@@ -162,11 +166,15 @@ public class ShadowDeploymentListener implements InjectionActions {
     }
 
     private boolean relevantNodeChanged(Node node) {
-        // List of configuration nodes that we need to reconfigure for if they change
-        return node.childOf(DEVICE_PARAM_THING_NAME) || node.childOf(DEVICE_PARAM_IOT_DATA_ENDPOINT)
-                || node.childOf(DEVICE_PARAM_PRIVATE_KEY_PATH)
-                || node.childOf(DEVICE_PARAM_CERTIFICATE_FILE_PATH) || node.childOf(DEVICE_PARAM_ROOT_CA_PATH)
-                || node.childOf(DEVICE_PARAM_AWS_REGION);
+        if (isSubscribedToShadowTopics.get()) {
+            return node.childOf(DEVICE_PARAM_THING_NAME);
+        } else {
+            // List of configuration nodes that may change during device provisioning
+            return node.childOf(DEVICE_PARAM_THING_NAME) || node.childOf(DEVICE_PARAM_IOT_DATA_ENDPOINT)
+                    || node.childOf(DEVICE_PARAM_PRIVATE_KEY_PATH)
+                    || node.childOf(DEVICE_PARAM_CERTIFICATE_FILE_PATH) || node.childOf(DEVICE_PARAM_ROOT_CA_PATH)
+                    || node.childOf(DEVICE_PARAM_AWS_REGION);
+        }
     }
 
     private void connectToShadowService(DeviceConfiguration deviceConfiguration)
@@ -183,11 +191,17 @@ public class ShadowDeploymentListener implements InjectionActions {
         mqttClient.addToCallbackEvents(callbacks);
         deploymentStatusKeeper.registerDeploymentStatusConsumer(DeploymentType.SHADOW,
                 this::deploymentStatusChanged, ShadowDeploymentListener.class.getName());
-        executorService.execute(() -> {
-            subscribeToShadowTopics();
-            // Get the shadow state when kernel starts up by publishing to get topic
-            publishToGetDeviceShadowTopic();
-        });
+        if (subscriptionFuture != null && !subscriptionFuture.isDone()) {
+            subscriptionFuture.cancel(false);
+        }
+        if (subscriptionFuture == null || subscriptionFuture.isDone()) {
+            subscriptionFuture = executorService.submit(() -> {
+                subscribeToShadowTopics();
+                this.isSubscribedToShadowTopics.set(true);
+                // Get the shadow state when kernel starts up by publishing to get topic
+                publishToGetDeviceShadowTopic();
+            });
+        }
     }
 
     /*

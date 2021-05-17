@@ -158,7 +158,7 @@ public class CredentialRequestHandler implements HttpHandler {
      *
      * @return credentials
      */
-    private byte[] getCredentialsBypassCache() throws DeviceConfigurationException {
+    private byte[] getCredentialsBypassCache()  {
         byte[] response;
         LOGGER.atDebug().kv(IOT_CRED_PATH_KEY, iotCredentialsPath).log("Got request for credentials, querying iot");
 
@@ -244,7 +244,7 @@ public class CredentialRequestHandler implements HttpHandler {
      * @return AWS credentials from cloud.
      * @throws DeviceConfigurationException When device is not configured to get credentials
      */
-    public byte[] getCredentials() throws DeviceConfigurationException {
+    public byte[] getCredentials() {
         TESCache cacheEntry = tesCache.get(iotCredentialsPath);
         if (areCredentialsValid(cacheEntry)) {
             return cacheEntry.credentials;
@@ -262,7 +262,7 @@ public class CredentialRequestHandler implements HttpHandler {
      * @return AwsCredentials instance compatible with the AWS SDK for credentials received from cloud.
      * @throws DeviceConfigurationException When device is not configured to get credentials
      */
-    public AwsCredentials getAwsCredentials() throws DeviceConfigurationException {
+    public AwsCredentials getAwsCredentials() {
         return getCredentialsFromByte(getCredentials());
     }
 
