@@ -85,6 +85,7 @@ public final class DeploymentDocumentConverter {
         return DeploymentDocument.builder().timestamp(localOverrideRequest.getRequestTimestamp())
                 .deploymentId(localOverrideRequest.getRequestId())
                 .deploymentPackageConfigurationList(packageConfigurations)
+                .requiredCapabilities(localOverrideRequest.getRequiredCapabilities())
                 .failureHandlingPolicy(FailureHandlingPolicy.DO_NOTHING)    // Can't rollback for local deployment
                 // Currently we skip update policy check for local deployment to not slow down testing for customers
                 // If we make this configurable in local development then we can plug that input in here
@@ -105,7 +106,7 @@ public final class DeploymentDocumentConverter {
         if (localOverrideRequest.getConfigurationUpdate() != null) {
             localOverrideRequest.getConfigurationUpdate().forEach((componentName, configUpdate) -> {
                 packageConfigurations.computeIfAbsent(componentName, DeploymentPackageConfiguration::new);
-                packageConfigurations.get(componentName).setConfigurationUpdateOperation(configUpdate);
+                packageConfigurations.get(componentName).setConfigurationUpdate(configUpdate);
                 packageConfigurations.get(componentName).setResolvedVersion(ANY_VERSION);
             });
         }
@@ -142,6 +143,7 @@ public final class DeploymentDocumentConverter {
 
         DeploymentDocument.DeploymentDocumentBuilder builder =
                 DeploymentDocument.builder().deploymentId(config.getConfigurationArn())
+                        .requiredCapabilities(config.getRequiredCapabilities())
                         .deploymentPackageConfigurationList(convertComponents(config.getComponents()))
                         .groupName(parseGroupNameFromConfigurationArn(config)).timestamp(config.getCreationTimestamp());
         if (config.getFailureHandlingPolicy() == null) {
@@ -172,6 +174,7 @@ public final class DeploymentDocumentConverter {
                     config.getConfigurationValidationPolicy())
             );
         }
+
         return builder.build();
     }
 
@@ -203,14 +206,14 @@ public final class DeploymentDocumentConverter {
             ComponentUpdate componentUpdate) {
 
         DeploymentPackageConfiguration.DeploymentPackageConfigurationBuilder builder =
-                DeploymentPackageConfiguration.builder().packageName(componentName)
+                DeploymentPackageConfiguration.builder().name(componentName)
                 .resolvedVersion(componentUpdate.getVersion().getValue())
                 .rootComponent(true) // As of now, CreateDeployment API only gives root component
-                .configurationUpdateOperation(
+                .configurationUpdate(
                         convertComponentUpdateOperation(componentUpdate.getConfigurationUpdate()));
-        if (componentUpdate.getRunWith() != null && componentUpdate.getRunWith().getPosixUser() != null) {
-            builder = builder.runWith(RunWith.builder().posixUser(componentUpdate.getRunWith().getPosixUser()).build());
-        }
+        builder = builder.runWith(RunWith.builder()
+                .posixUser(componentUpdate.getRunWith() == null ? null : componentUpdate.getRunWith().getPosixUser())
+                .build());
         return builder.build();
     }
 

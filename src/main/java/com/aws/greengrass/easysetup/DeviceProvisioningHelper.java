@@ -25,7 +25,6 @@ import software.amazon.awssdk.http.HttpExecuteResponse;
 import software.amazon.awssdk.http.SdkHttpClient;
 import software.amazon.awssdk.http.SdkHttpFullRequest;
 import software.amazon.awssdk.http.SdkHttpMethod;
-import software.amazon.awssdk.http.apache.ApacheHttpClient;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.greengrassv2.GreengrassV2Client;
 import software.amazon.awssdk.services.greengrassv2.model.ComponentDeploymentSpecification;
@@ -212,9 +211,9 @@ public class DeviceProvisioningHelper {
         // Find or create IoT policy
         try {
             client.getPolicy(GetPolicyRequest.builder().policyName(policyName).build());
-            outStream.println(String.format("Found IoT policy \"%s\", reusing it", policyName));
+            outStream.printf("Found IoT policy \"%s\", reusing it%n", policyName);
         } catch (ResourceNotFoundException e) {
-            outStream.println(String.format("Creating new IoT policy \"%s\"", policyName));
+            outStream.printf("Creating new IoT policy \"%s\"%n", policyName);
             client.createPolicy(CreatePolicyRequest.builder().policyName(policyName).policyDocument(
                     "{\n  \"Version\": \"2012-10-17\",\n  \"Statement\": [\n    {\n"
                             + "      \"Effect\": \"Allow\",\n      \"Action\": [\n"
@@ -236,7 +235,7 @@ public class DeviceProvisioningHelper {
                 AttachPolicyRequest.builder().policyName(policyName).target(keyResponse.certificateArn()).build());
 
         // Create the thing and attach the cert to it
-        outStream.println(String.format("Creating IoT Thing \"%s\"...", thingName));
+        outStream.printf("Creating IoT Thing \"%s\"...%n", thingName);
         String thingArn = client.createThing(CreateThingRequest.builder().thingName(thingName).build()).thingArn();
         outStream.println("Attaching certificate to IoT thing...");
         client.attachThingPrincipal(
@@ -282,10 +281,10 @@ public class DeviceProvisioningHelper {
      */
     private void downloadRootCAToFile(File f) throws IOException {
         if (f.exists()) {
-            outStream.println(String.format("Root CA found at \"%s\". Skipping download.", f.toString()));
+            outStream.printf("Root CA found at \"%s\". Skipping download.%n", f);
             return;
         }
-        outStream.println(String.format("Downloading Root CA from \"%s\"", ROOT_CA_URL));
+        outStream.printf("Downloading Root CA from \"%s\"%n", ROOT_CA_URL);
         downloadFileFromURL(ROOT_CA_URL, f);
     }
 
@@ -314,8 +313,7 @@ public class DeviceProvisioningHelper {
     }
 
     private SdkHttpClient getSdkHttpClient() {
-        SdkHttpClient proxyClient = ProxyUtils.getSdkHttpClient();
-        return proxyClient == null ? ApacheHttpClient.builder().build() : proxyClient;
+        return ProxyUtils.getSdkHttpClient();
     }
 
     /**
@@ -366,8 +364,7 @@ public class DeviceProvisioningHelper {
                     DescribeRoleAliasRequest.builder().roleAlias(roleAliasName).build();
             roleAliasArn = iotClient.describeRoleAlias(describeRoleAliasRequest).roleAliasDescription().roleAliasArn();
         } catch (ResourceNotFoundException ranfe) {
-            outStream.println(
-                    String.format("TES role alias \"%s\" does not exist, creating new alias...", roleAliasName));
+            outStream.printf("TES role alias \"%s\" does not exist, creating new alias...%n", roleAliasName);
 
             // Get IAM role arn in order to attach an alias to it
             String roleArn;
@@ -375,7 +372,7 @@ public class DeviceProvisioningHelper {
                 GetRoleRequest getRoleRequest = GetRoleRequest.builder().roleName(roleName).build();
                 roleArn = iamClient.getRole(getRoleRequest).role().arn();
             } catch (NoSuchEntityException | ResourceNotFoundException rnfe) {
-                outStream.println(String.format("TES role \"%s\" does not exist, creating role...", roleName));
+                outStream.printf("TES role \"%s\" does not exist, creating role...%n", roleName);
                 CreateRoleRequest createRoleRequest = CreateRoleRequest.builder().roleName(roleName).description(
                         "Role for Greengrass IoT things to interact with AWS services using token exchange service")
                         .assumeRolePolicyDocument("{\n  \"Version\": \"2012-10-17\",\n"
@@ -395,8 +392,8 @@ public class DeviceProvisioningHelper {
         try {
             iotClient.getPolicy(GetPolicyRequest.builder().policyName(iotRolePolicyName).build());
         } catch (ResourceNotFoundException e) {
-            outStream.println(String.format("IoT role policy \"%s\" for TES Role alias not exist, creating policy...",
-                    iotRolePolicyName));
+            outStream.printf("IoT role policy \"%s\" for TES Role alias not exist, creating policy...%n",
+                    iotRolePolicyName);
             CreatePolicyRequest createPolicyRequest = CreatePolicyRequest.builder().policyName(iotRolePolicyName)
                     .policyDocument("{\n\t\"Version\": \"2012-10-17\",\n\t\"Statement\": {\n"
                             + "\t\t\"Effect\": \"Allow\",\n\t\t\"Action\": \"iot:AssumeRoleWithCertificate\",\n"
@@ -465,11 +462,11 @@ public class DeviceProvisioningHelper {
             outStream.println("No managed IAM policy found, looking for user defined policy...");
         } catch (IamException e) {
             if (e.getMessage().contains("not authorized to perform")) {
-                outStream.println(String.format("Encountered error - %s; No permissions to lookup managed policy, "
-                        + "looking for a user defined policy...", e.getMessage()));
+                outStream.printf("Encountered error - %s; No permissions to lookup managed policy, "
+                        + "looking for a user defined policy...%n", e.getMessage());
             }
-            outStream.println(String.format("Exiting due to unexpected error while looking up managed policy - %s ",
-                    e.getMessage()));
+            outStream.printf("Exiting due to unexpected error while looking up managed policy - %s %n",
+                    e.getMessage());
             throw e;
         }
         // Check if a customer policy exists with the name
@@ -481,14 +478,14 @@ public class DeviceProvisioningHelper {
             outStream.println("No IAM policy found, will attempt creating one...");
         } catch (IamException e) {
             if (e.getMessage().contains("not authorized to perform")) {
-                outStream.println(String.format(
+                outStream.printf(
                         "Encountered error - %s; No permissions to lookup IAM policy, will attempt creating one. If you"
                                 + " wish to use an existing policy instead, please make sure the credentials used for "
-                                + "setup have iam::getPolicy permissions for the policy resource and retry...",
-                        e.getMessage()));
+                                + "setup have iam::getPolicy permissions for the policy resource and retry...%n",
+                        e.getMessage());
             }
-            outStream.println(String.format("Exiting due to unexpected error while looking up user defined policy - %s",
-                    e.getMessage()));
+            outStream.printf("Exiting due to unexpected error while looking up user defined policy - %s%n",
+                    e.getMessage());
             throw e;
         }
         return Optional.empty();

@@ -173,7 +173,7 @@ public class GreengrassSetup {
     private final String[] setupArgs;
     private final List<String> kernelArgs = new ArrayList<>();
     @Setter
-    DeviceProvisioningHelper deviceProvisioningHelper;
+    private DeviceProvisioningHelper deviceProvisioningHelper;
     private final PrintStream outStream;
     private final PrintStream errStream;
     private int argpos = 0;
@@ -287,10 +287,9 @@ public class GreengrassSetup {
             throw new RuntimeException(e);
         }
 
-        //initialize the device provisioning helper
-        this.deviceProvisioningHelper = new DeviceProvisioningHelper(awsRegion, environmentStage, this.outStream);
-
         if (needProvisioning) {
+            // initialize the device provisioning helper only if we're doing provisioning
+            this.deviceProvisioningHelper = new DeviceProvisioningHelper(awsRegion, environmentStage, this.outStream);
             provision(kernel);
         }
 
@@ -429,6 +428,11 @@ public class GreengrassSetup {
                     kernel.getContext().get(DeviceConfiguration.class).getNucleusVersion());
         }
 
+        // Dump config since we've just provisioned so that the bootstrap config will enable us to
+        // reach the cloud when needed. Must do this now because we normally would never overwrite the bootstrap
+        // file, however we need to do it since we've only just learned about our endpoints, certs, etc.
+        kernel.writeEffectiveConfigAsTransactionLog(kernel.getNucleusPaths().configPath()
+                .resolve(Kernel.DEFAULT_BOOTSTRAP_CONFIG_TLOG_FILE));
     }
 
     @SuppressWarnings("PMD.PreserveStackTrace")
